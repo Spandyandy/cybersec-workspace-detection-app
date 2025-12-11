@@ -36,7 +36,6 @@ print()
 import os
 import re
 import yaml
-import glob
 from datetime import datetime, timedelta
 from typing import Dict, Tuple, Any
 from pyspark.sql.functions import col
@@ -44,7 +43,20 @@ from databricks.sdk import WorkspaceClient
 from databricks.sdk.service.workspace import ImportFormat, Language
 import io
 w = WorkspaceClient()
-cwd = os.getcwd().replace("/base/notebooks", "")
+
+# Get current notebook path (works on both classic compute and serverless)
+def get_notebook_path():
+    return dbutils.notebook.entry_point.getDbutils().notebook().getContext().notebookPath().get()
+
+def get_repo_root():
+    """Get the repository root path from the current notebook location."""
+    notebook_path = get_notebook_path()
+    # notebook_path is like: /Users/user@email.com/repo/base/notebooks/notebook_name
+    notebooks_dir = os.path.dirname(notebook_path)  # .../base/notebooks
+    base_dir = os.path.dirname(notebooks_dir)       # .../base
+    return os.path.dirname(base_dir)                # .../repo (root)
+
+cwd = get_repo_root()
 
 # COMMAND ----------
 
@@ -134,25 +146,44 @@ def parse_detection_file(file_path: str) -> Dict[str, Any]:
         "metadata": metadata
     }
 
-def discover_detections(base_path: str = "/../detections") -> Dict[str, Dict]:
-    """Dynamically discover all detection files and parse their metadata"""
-    
-    detections = {}
-    workspace_dir = os.getcwd() + "/../detections"
-    path = os.path.join(workspace_dir, "*")
-    print(f"Looking for detection files in {path}")
-    detection_files = [os.path.abspath(os.path.realpath(f)) for f in glob.glob(path)]
+def discover_detections(base_path: str = None) -> Dict[str, Dict]:
+    """Dynamically discover all detection files and parse their metadata.
+    Uses Databricks workspace SDK for compatibility with both classic compute and serverless.
+    """
 
-    print(f"Discovering detections in {path}...")
+    detections = {}
+
+    # Get the detections directory path
+    if base_path is None:
+        detections_dir = os.path.join(cwd, "base", "detections")
+    else:
+        detections_dir = base_path
+
+    print(f"Looking for detection files in {detections_dir}")
+
+    # Use workspace SDK to list files (works on both classic and serverless)
+    try:
+        detection_objects = list(w.workspace.list(detections_dir))
+        detection_files = [
+            obj.path for obj in detection_objects
+            if obj.path and (obj.path.endswith(".py") or
+                           (obj.object_type and obj.object_type.name == "NOTEBOOK"))
+        ]
+    except Exception as e:
+        print(f"Failed to list detections directory: {e}")
+        return detections
+
+    print(f"Discovering detections in {detections_dir}...")
     print(f"Found {len(detection_files)} detection files")
     print(f"detection_files: {detection_files}")
+
     for file_path in detection_files:
         detection_info = parse_detection_file(file_path)
         if detection_info:
             detection_name = detection_info["file_name"]
             detections[detection_name] = detection_info
             print(f"  ✓ Loaded: {detection_name}")
-    
+
     print(f"\nSuccessfully loaded {len(detections)} detections")
     return detections
 

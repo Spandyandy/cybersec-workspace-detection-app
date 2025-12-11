@@ -431,26 +431,55 @@ def get_time_range_from_widgets(default_hours: int = 24):
     print(f"✅ Using time range: earliest = {earliest}, latest = {latest}")
     return earliest, latest
 
+def get_notebook_path():
+    """Get the current notebook's workspace path. Works on both classic compute and serverless."""
+    return dbutils.notebook.entry_point.getDbutils().notebook().getContext().notebookPath().get()
+
+def get_detections_dir():
+    """Get the detections directory path relative to the current notebook."""
+    import os
+    notebook_path = get_notebook_path()
+    # notebook_path is like: /Users/user@email.com/repo/base/notebooks/notebook_name
+    notebooks_dir = os.path.dirname(notebook_path)  # /Users/user@email.com/repo/base/notebooks
+    base_dir = os.path.dirname(notebooks_dir)       # /Users/user@email.com/repo/base
+    return os.path.join(base_dir, "detections")     # /Users/user@email.com/repo/base/detections
+
 def run_all_detections(
-    workspace_dir: str,
-    earliest: str,
-    latest: str,
+    workspace_dir: str = None,
+    earliest: str = None,
+    latest: str = None,
     notebook_filter: str = None
 ):
     import re
-    from pathlib import PurePosixPath
+    from databricks.sdk import WorkspaceClient
+
+    # If workspace_dir not provided, derive it from the current notebook path
+    if workspace_dir is None:
+        workspace_dir = get_detections_dir()
+    elif workspace_dir.startswith("..") or workspace_dir.startswith("/Workspace"):
+        # Convert relative or /Workspace paths to workspace API paths
+        if workspace_dir.startswith("/Workspace"):
+            workspace_dir = workspace_dir.replace("/Workspace", "", 1)
+        else:
+            # Relative path - resolve from current notebook
+            import os
+            notebook_path = get_notebook_path()
+            notebooks_dir = os.path.dirname(notebook_path)
+            workspace_dir = os.path.normpath(os.path.join(notebooks_dir, workspace_dir))
 
     print(f"Scanning Workspace notebooks in: {workspace_dir}")
 
     try:
-        notebooks = dbutils.fs.ls(f"file:{workspace_dir}")
+        w = WorkspaceClient()
+        notebooks = list(w.workspace.list(workspace_dir))
     except Exception as e:
         print(f"Failed to list: {e}")
         return
 
     notebook_paths = [
-        f"{workspace_dir}/{f.name}" for f in notebooks
-        if f.name.endswith(".py") or f.name.endswith(".ipynb") or f.name.endswith(".dbc")
+        obj.path for obj in notebooks
+        if obj.path and (obj.path.endswith(".py") or obj.path.endswith(".ipynb") or
+                         obj.object_type and obj.object_type.name == "NOTEBOOK")
     ]
 
     if notebook_filter:
@@ -458,10 +487,11 @@ def run_all_detections(
         notebook_paths = [n for n in notebook_paths if pattern.search(n)]
 
     for full_path in notebook_paths:
-        run_path = str(PurePosixPath(full_path).with_suffix(""))
+        # Remove file extension for notebook.run
+        run_path = re.sub(r'\.(py|ipynb)$', '', full_path)
 
         try:
-            dbutils.notebook.run(run_path,3600, arguments={
+            dbutils.notebook.run(run_path, 3600, arguments={
                 "earliest": earliest,
                 "latest": latest
             })
