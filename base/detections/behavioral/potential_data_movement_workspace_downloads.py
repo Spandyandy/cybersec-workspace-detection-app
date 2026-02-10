@@ -42,7 +42,7 @@
 # MAGIC       schema: []
 # MAGIC       data: null
 # MAGIC     mocked_inputs:
-# MAGIC     - table: system.access.audit
+# MAGIC     - table: sandbox.audit_poc.audit
 # MAGIC       path: None
 # MAGIC     required_columns:
 # MAGIC     - EVENT_TIME
@@ -82,7 +82,7 @@ def potential_data_movement_workspace_downloads(earliest: str = None, latest: st
         'getModelVersionSignedDownloadUri'
     ]
     
-    df = spark.table("system.access.audit")
+    df = spark.table("sandbox.audit_poc.audit")
     
     # Filter for various download/export activities that could indicate data exfiltration
     df_filtered = df.filter(
@@ -121,5 +121,3 @@ if __name__ == "__main__" or dbutils.widgets.get("earliest"):
         earliest=dbutils.widgets.get("earliest"),
         latest=dbutils.widgets.get("latest")
     ))
-
-# COMMAND ----------

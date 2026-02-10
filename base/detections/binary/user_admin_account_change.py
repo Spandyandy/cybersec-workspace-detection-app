@@ -42,7 +42,7 @@
 # MAGIC       schema: []
 # MAGIC       data: null
 # MAGIC     mocked_inputs:
-# MAGIC     - table: system.access.audit
+# MAGIC     - table: sandbox.audit_poc.audit
 # MAGIC       path: None
 # MAGIC     required_columns:
 # MAGIC     - EVENT_TIME
@@ -87,7 +87,7 @@ def user_admin_account_change(earliest: str = None, latest: str = None):
         'removePrincipalFromGroup'
     ]
     
-    df = spark.table("system.access.audit")
+    df = spark.table("sandbox.audit_poc.audit")
     
     # Filter for admin-related changes
     df_filtered = df.filter(
@@ -127,4 +127,3 @@ if __name__ == "__main__" or dbutils.widgets.get("earliest"):
         latest=dbutils.widgets.get("latest")
     ))
     
-# COMMAND ----------

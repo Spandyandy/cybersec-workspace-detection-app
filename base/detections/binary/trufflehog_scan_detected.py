@@ -42,7 +42,7 @@
 # MAGIC       schema: []
 # MAGIC       data: null
 # MAGIC     mocked_inputs:
-# MAGIC     - table: system.access.audit
+# MAGIC     - table: sandbox.audit_poc.audit
 # MAGIC       path: None
 # MAGIC     required_columns:
 # MAGIC     - EVENT_TIME
@@ -62,7 +62,7 @@ def trufflehog_scan_detected(earliest: str = None, latest: str = None):
     latest = latest or current_timestamp()
     
     # Load audit logs within the time range
-    df = spark.table("system.access.audit")
+    df = spark.table("sandbox.audit_poc.audit")
     
     # Filter for TruffleHog user agent within the time range
     df_filtered = df.filter(
@@ -89,4 +89,3 @@ if __name__ == "__main__" or dbutils.widgets.get("earliest"):
         earliest=dbutils.widgets.get("earliest"),
         latest=dbutils.widgets.get("latest")
     ))
-# COMMAND ----------

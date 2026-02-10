@@ -39,7 +39,7 @@
 # MAGIC       schema: []
 # MAGIC       data: null
 # MAGIC     mocked_inputs:
-# MAGIC     - table: system.access.audit
+# MAGIC     - table: sandbox.audit_poc.audit
 # MAGIC       path: None
 # MAGIC     required_columns:
 # MAGIC     - QUERY_DATE
@@ -92,7 +92,7 @@ def spikes_in_admin_activity(earliest: str, latest: str, threshold: int = 0):
     from pyspark.sql.functions import (
         col, count, countDistinct, date_format, expr, lit, lower, max, min, to_date, upper, avg
     )    
-    df = spark.table("system.access.audit")
+    df = spark.table("sandbox.audit_poc.audit")
 
     # Filter relevant events
     df_filtered = df.filter(
@@ -149,6 +149,7 @@ def spikes_in_admin_activity(earliest: str, latest: str, threshold: int = 0):
 
 
 # COMMAND ----------
+
 if __name__ == "__main__" or dbutils.widgets.get("earliest"):
     earliest, latest = get_time_range_from_widgets()
     display(spikes_in_admin_activity(

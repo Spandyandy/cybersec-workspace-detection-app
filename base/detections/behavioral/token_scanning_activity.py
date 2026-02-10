@@ -2,6 +2,7 @@
 # MAGIC %run ../../../lib/common
 
 # COMMAND ----------
+
 # MAGIC %md
 # MAGIC ```yaml
 # MAGIC dscc:
@@ -42,7 +43,7 @@
 # MAGIC       schema: []
 # MAGIC       data: null
 # MAGIC     mocked_inputs:
-# MAGIC     - table: system.access.audit
+# MAGIC     - table: sandbox.audit_poc.audit
 # MAGIC       path: None
 # MAGIC     required_columns:
 # MAGIC     - RATE
@@ -69,7 +70,7 @@ def token_scanning_activity(earliest: str, latest: str, threshold: int = 0):
 
     from pyspark.sql.functions import col, min, max, regexp_replace, current_date, date_sub, count, first, concat, lit, when, struct
 
-    df = spark.table("system.access.audit")
+    df = spark.table("sandbox.audit_poc.audit")
 
     # Check if GeoIP enrichment is available
     geo_available = geo_info is not None

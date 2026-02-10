@@ -37,7 +37,7 @@
 # MAGIC       schema: []
 # MAGIC       data: null
 # MAGIC     mocked_inputs:
-# MAGIC     - table: system.access.audit
+# MAGIC     - table: sandbox.audit_poc.audit
 # MAGIC       path: None
 # MAGIC     required_columns:
 # MAGIC     - EVENT_DATE
@@ -61,7 +61,7 @@ def user_account_deleted(earliest:str = None, latest: str = None):
 
     earliest = earliest or current_timestamp() - expr("INTERVAL 24 hours")
     latest = latest or current_timestamp()
-    df = spark.table("system.access.audit")
+    df = spark.table("sandbox.audit_poc.audit")
 
     df_filtered = df.filter(
         (col("service_name") == "accounts") &
@@ -82,6 +82,7 @@ def user_account_deleted(earliest:str = None, latest: str = None):
     return df_filtered
 
 # COMMAND ----------
+
 if __name__ == "__main__" or dbutils.widgets.get("earliest"):
     earliest, latest = get_time_range_from_widgets()
     display(user_account_deleted(

@@ -39,7 +39,7 @@
 # MAGIC       schema: []
 # MAGIC       data: null
 # MAGIC     mocked_inputs:
-# MAGIC     - table: system.access.audit
+# MAGIC     - table: sandbox.audit_poc.audit
 # MAGIC       path: None
 # MAGIC     required_columns:
 # MAGIC     - action_name
@@ -84,7 +84,7 @@ def attempted_logon_from_denied_ip(earliest:str = None, latest: str = None, igno
     ]
     excluded_paths_regex = "|".join(excluded_paths)
 
-    df = spark.table("system.access.audit")
+    df = spark.table("sandbox.audit_poc.audit")
 
     if ignore_tokens:
         uuid_pattern = r'[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}'

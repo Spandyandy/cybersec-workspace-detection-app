@@ -42,7 +42,7 @@
 # MAGIC       schema: []
 # MAGIC       data: null
 # MAGIC     mocked_inputs:
-# MAGIC     - table: system.query.history
+# MAGIC     - table: sandbox.audit_poc.history
 # MAGIC       path: None
 # MAGIC     required_columns:
 # MAGIC     - START_TIME
@@ -67,7 +67,7 @@ def potential_data_movement_sql_queries(earliest: str = None, latest: str = None
     earliest = earliest or current_timestamp() - expr("INTERVAL 2 months")
     latest = latest or current_timestamp()
     
-    df = spark.table("system.query.history")
+    df = spark.table("sandbox.audit_poc.history")
     
     # Base filter for time range and COPY INTO with CREDENTIALS
     df_filtered = df.filter(
@@ -103,4 +103,3 @@ if __name__ == "__main__" or dbutils.widgets.get("earliest"):
         earliest=dbutils.widgets.get("earliest"),
         latest=dbutils.widgets.get("latest")
     ))
-# COMMAND ----------

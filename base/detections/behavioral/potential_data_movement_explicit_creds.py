@@ -41,7 +41,7 @@
 # MAGIC       schema: []
 # MAGIC       data: null
 # MAGIC     mocked_inputs:
-# MAGIC     - table: system.access.audit
+# MAGIC     - table: sandbox.audit_poc.audit
 # MAGIC       path: None
 # MAGIC     required_columns:
 # MAGIC     - EVENT_TIME
@@ -79,7 +79,7 @@ def potential_data_movement_explicit_creds(earliest: str = None, latest: str = N
         'updateConnection'
     ]
     
-    df = spark.table("system.access.audit")
+    df = spark.table("sandbox.audit_poc.audit")
     
     # Filter for data movement actions with potential explicit credentials
     df_filtered = df.filter(
@@ -105,4 +105,3 @@ if __name__ == "__main__" or dbutils.widgets.get("earliest"):
         earliest=dbutils.widgets.get("earliest"),
         latest=dbutils.widgets.get("latest")
     ))
-# COMMAND ----------

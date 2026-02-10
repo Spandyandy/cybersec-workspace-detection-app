@@ -41,7 +41,7 @@
 # MAGIC       schema: []
 # MAGIC       data: null
 # MAGIC     mocked_inputs:
-# MAGIC     - table: system.access.audit
+# MAGIC     - table: sandbox.audit_poc.audit
 # MAGIC       path: None
 # MAGIC     required_columns:
 # MAGIC     - EVENT_TIME
@@ -72,7 +72,7 @@ def configuration_changes_account_level(earliest: str = None, latest: str = None
     earliest = earliest or current_timestamp() - expr("INTERVAL 2 months")
     latest = latest or current_timestamp()
     
-    df = spark.table("system.access.audit")
+    df = spark.table("sandbox.audit_poc.audit")
     
     # Filter for account-level setting changes
     df_filtered = df.filter(
@@ -104,4 +104,3 @@ if __name__ == "__main__" or dbutils.widgets.get("earliest"):
         earliest=dbutils.widgets.get("earliest"),
         latest=dbutils.widgets.get("latest")
     ))
-# COMMAND ----------

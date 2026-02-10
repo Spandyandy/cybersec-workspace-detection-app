@@ -98,11 +98,11 @@ def parse_detection_file(file_path: str) -> Dict[str, Any]:
         return None
     full_function = full_function_match.group(1)
     user_replaced = False
-    if 'spark.table("system.access.audit")' in full_function:
-        full_function = full_function.replace('spark.table("system.access.audit")', 'spark.table("system.access.audit").filter(col("user_identity.email") == "{}")'.format(user_email))
+    if 'spark.table("sandbox.audit_poc.audit")' in full_function:
+        full_function = full_function.replace('spark.table("sandbox.audit_poc.audit")', 'spark.table("sandbox.audit_poc.audit").filter(col("user_identity.email") == "{}")'.format(user_email))
         user_replaced = True
-    if 'spark.table("system.query.history")' in full_function:
-        full_function = full_function.replace('spark.table("system.query.history")', 'spark.table("system.query.history").filter(col("executed_as") == "{}")'.format(user_email))
+    if 'spark.table("sandbox.audit_poc.history")' in full_function:
+        full_function = full_function.replace('spark.table("sandbox.audit_poc.history")', 'spark.table("sandbox.audit_poc.history").filter(col("executed_as") == "{}")'.format(user_email))
         user_replaced = True
     if not user_replaced:
         print(f"Warning: No user filter inserted into {file_path}")
@@ -330,7 +330,7 @@ select
     count(*) as total_events, 
     count(distinct service_name || action_name) as num_unique_actions, 
     source_ip_address 
-from system.access.audit 
+from sandbox.audit_poc.audit 
 where user_identity.email = '{{USER_EMAIL}}' and event_time between '{{EARLIEST}}' and '{{LATEST}}' 
 group by all 
 order by earliest desc
@@ -353,7 +353,7 @@ select
   count(distinct source_ip_address) as num_source_ips, 
   count(distinct user_agent) as num_useragents, 
   request_params.tokenId 
-from system.access.audit where 
+from sandbox.audit_poc.audit where 
   action_name == "tokenLogin" and 
   request_params.authenticationMethod!='API_INT_PAT_TOKEN' and  -- filters out internal actions from a notebook / job
   user_identity.email = '{{USER_EMAIL}}' and event_time between '{{EARLIEST}}' and '{{LATEST}}' 
@@ -377,7 +377,7 @@ select
   action_name,  
   count(distinct source_ip_address) as num_source_ips, 
   count(distinct user_agent) as num_useragents
-from system.access.audit 
+from sandbox.audit_poc.audit 
 where user_identity.email = '{{USER_EMAIL}}' and event_time between '{{EARLIEST}}' and '{{LATEST}}' 
 group by all 
 order by earliest desc

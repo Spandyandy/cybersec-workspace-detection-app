@@ -121,16 +121,16 @@ def parse_detection_file(file_path: str, user_email: Optional[str] = None) -> Di
     # Apply user filter if specified (for user behavior analysis)
     user_replaced = False
     if user_email:
-        if 'spark.table("system.access.audit")' in full_function:
+        if 'spark.table("sandbox.audit_poc.audit")' in full_function:
             full_function = full_function.replace(
-                'spark.table("system.access.audit")',
-                f'spark.table("system.access.audit").filter(col("user_identity.email") == "{user_email}")'
+                'spark.table("sandbox.audit_poc.audit")',
+                f'spark.table("sandbox.audit_poc.audit").filter(col("user_identity.email") == "{user_email}")'
             )
             user_replaced = True
-        if 'spark.table("system.query.history")' in full_function:
+        if 'spark.table("sandbox.audit_poc.history")' in full_function:
             full_function = full_function.replace(
-                'spark.table("system.query.history")',
-                f'spark.table("system.query.history").filter(col("executed_as") == "{user_email}")'
+                'spark.table("sandbox.audit_poc.history")',
+                f'spark.table("sandbox.audit_poc.history").filter(col("executed_as") == "{user_email}")'
             )
             user_replaced = True
         if not user_replaced:
@@ -610,5 +610,3 @@ else:
 """
 
     return notebook_content
-
-# COMMAND ----------

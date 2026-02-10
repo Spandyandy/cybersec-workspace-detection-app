@@ -37,7 +37,7 @@
 # MAGIC       schema: []
 # MAGIC       data: null
 # MAGIC     mocked_inputs:
-# MAGIC     - table: system.access.audit
+# MAGIC     - table: sandbox.audit_poc.audit
 # MAGIC       path: None
 # MAGIC     required_columns:
 # MAGIC     - action_name
@@ -62,7 +62,7 @@ def databricks_employee_logon(earliest:str = None, latest: str = None):
     earliest = earliest or current_timestamp() - expr("INTERVAL 24 hours")
     latest = latest or current_timestamp()
 
-    df = spark.table("system.access.audit")
+    df = spark.table("sandbox.audit_poc.audit")
     
     df_filtered = df.filter(
         (col("service_name") == "accounts") &

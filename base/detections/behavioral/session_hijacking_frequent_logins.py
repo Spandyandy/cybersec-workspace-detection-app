@@ -67,7 +67,7 @@ def session_hijack_high_session_count(earliest: str=None, latest: str = None, th
     known_ua_regex = "|".join(known_user_agents)
 
     # Load audit logs within the time range
-    df_logins = spark.table("system.access.audit") \
+    df_logins = spark.table("sandbox.audit_poc.audit") \
         .filter((F.col("event_time") >= earliest) & (F.col("event_time") <= latest)) \
         .filter(F.col("service_name") == "accounts") \
         .filter(F.col("action_name").isin(["login", "tokenLogin", "samlLogin", "jwtLogin"])) \
@@ -103,6 +103,7 @@ def session_hijack_high_session_count(earliest: str=None, latest: str = None, th
     return df_suspicious_logins
 
 # COMMAND ----------
+
 if __name__ == "__main__" or dbutils.widgets.get("earliest"):
     earliest, latest = get_time_range_from_widgets()
     display(session_hijack_high_session_count(

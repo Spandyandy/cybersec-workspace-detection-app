@@ -16,7 +16,7 @@
 # MAGIC     description: 'Detects high-priority configuration changes including verbose audit 
 # MAGIC       logging modifications, IP access list changes, and customer-approved workspace 
 # MAGIC       login configuration updates that could impact security posture.
-# MAGIC 
+# MAGIC
 # MAGIC       '
 # MAGIC     objective: 'Monitor critical configuration changes that could weaken security 
 # MAGIC       controls, modify access policies, or reduce system visibility. This includes 
@@ -24,7 +24,7 @@
 # MAGIC       customer-approved workspace login configuration changes which may signal 
 # MAGIC       attacker evasion, insider threat activity, or unauthorized configuration 
 # MAGIC       tampering.
-# MAGIC 
+# MAGIC
 # MAGIC       '
 # MAGIC     taxonomy: 
 # MAGIC       - MITRE.TA0004.Privilege_Escalation
@@ -46,7 +46,7 @@
 # MAGIC       schema: []
 # MAGIC       data: null
 # MAGIC     mocked_inputs:
-# MAGIC     - table: system.access.audit
+# MAGIC     - table: sandbox.audit_poc.audit
 # MAGIC       path: None
 # MAGIC     required_columns:
 # MAGIC     - EVENT_DATE
@@ -72,7 +72,7 @@ def configuration_changes_high_priority(earliest:str = None, latest: str = None)
     earliest = earliest or current_timestamp() - expr("INTERVAL 24 hours")
     latest = latest or current_timestamp()
 
-    df = spark.table("system.access.audit")
+    df = spark.table("sandbox.audit_poc.audit")
 
     # Filter for high-priority configuration changes
     df_filtered = df.filter(

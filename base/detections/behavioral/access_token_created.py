@@ -41,7 +41,7 @@
 # MAGIC       schema: []
 # MAGIC       data: null
 # MAGIC     mocked_inputs:
-# MAGIC     - table: system.access.audit
+# MAGIC     - table: sandbox.audit_poc.audit
 # MAGIC       path: None
 # MAGIC     required_columns:
 # MAGIC     - EVENT_DATE
@@ -74,7 +74,7 @@ def access_token_created(earliest:str = None, latest: str = None):
     known_src_ips = ["52.9.53.2"]
     known_src_ips_regex = "|".join(known_src_ips)
 
-    df = spark.table("system.access.audit")
+    df = spark.table("sandbox.audit_poc.audit")
  
     df_filtered = df.filter(
         (col("service_name") == "accounts") &
@@ -113,4 +113,5 @@ if __name__ == "__main__" or dbutils.widgets.get("earliest"):
     ))
 
 # COMMAND ----------
+
 
