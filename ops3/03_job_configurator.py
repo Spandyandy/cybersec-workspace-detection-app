@@ -5,6 +5,7 @@
 # MAGIC 특정 `rule_group` 단위로 Job Parameter, Cron Schedule, Pause Status 등을 일괄(Bulk) 업데이트할 수 있습니다.
 
 # COMMAND ----------
+
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.service import jobs
 import pyspark.sql.functions as F
@@ -42,6 +43,8 @@ new_cron = dbutils.widgets.get("new_cron_expression").strip()
 print(f"Target Group: {target_rule_group} | Action: {action_type}")
 
 # COMMAND ----------
+
+# DBTITLE 1,Jobs Parameters & Configs
 # 2. Scan and Display All Relevant Jobs
 all_jobs = w.jobs.list(expand_tasks=True)
 
@@ -82,6 +85,7 @@ jobs_df = spark.createDataFrame(audit_jobs)
 display(jobs_df.orderBy("rule_group", "job_name"))
 
 # COMMAND ----------
+
 # 3. Filter Target Jobs for Bulk Action
 target_jobs = []
 for j in audit_jobs:
@@ -91,9 +95,10 @@ for j in audit_jobs:
 print(f"\nFound {len(target_jobs)} jobs matching target_rule_group: '{target_rule_group}'")
 
 if action_type == "DRY_RUN" or len(target_jobs) == 0:
-    dbutils.notebook.exit("DRY_RUN - No changes applied.")
+    dbutils.notebook.exit("DRY_RUN - 변경없음.")
 
 # COMMAND ----------
+
 # 4. Execute Bulk Update Actions
 success_count = 0
 
