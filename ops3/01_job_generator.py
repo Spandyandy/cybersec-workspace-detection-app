@@ -57,7 +57,11 @@ for r in rules:
                             "window_end_ts": "",
                             "severity": "medium"   # Default severity
                         }
-                    )
+                    ),
+                    libraries=[
+                        compute.Library(pypi=compute.PythonPyPiLibrary(package="geoip2")),
+                        compute.Library(pypi=compute.PythonPyPiLibrary(package="netaddr"))
+                    ]
                 )
             ]
         )
