@@ -32,10 +32,15 @@ severity = dbutils.widgets.get("severity").strip()
 
 if not rule_id:
     raise ValueError("rule_id is required parameter")
-if not window_start_ts:
-    raise ValueError("window_start_ts is required parameter")
 if not window_end_ts:
-    raise ValueError("window_end_ts is required parameter")
+    window_end_ts = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+if not window_start_ts:
+    try:
+        end_dt = datetime.datetime.strptime(window_end_ts, "%Y-%m-%d %H:%M:%S")
+    except ValueError:
+        end_dt = datetime.datetime.now(datetime.timezone.utc)
+    start_dt = end_dt - datetime.timedelta(hours=24)
+    window_start_ts = start_dt.strftime("%Y-%m-%d %H:%M:%S")
 
 run_id = f"{rule_id}_{int(time.time())}"
 print(f"Starting run for rule_id: {rule_id} | Window: {window_start_ts} ~ {window_end_ts} | Severity: {severity}")
@@ -94,6 +99,7 @@ def finalize_run(status: str, row_count: int = 0, error_msg: str = None):
 
 
 # COMMAND ----------
+
 # 3. Retrieve rule logic metadata (notebook path & callable name)
 meta_df = spark.sql(f"""
     SELECT module_path, callable_name
@@ -115,12 +121,25 @@ callable_name = meta[0]["callable_name"]
 # 4. Execute Rule Logic
 row_count = 0
 try:
-    mod = dbutils.import_notebook(module_path)
-    fn = getattr(mod, callable_name)
-
-    # AS-IS runner와 동일하게 window range를 넘겨서 룰 추출 스크립트 실행
-    df = fn(earliest=window_start_ts, latest=window_end_ts)
-    row_count = df.count()
+    import re
+    # Remove file extension for notebook.run
+    run_path = re.sub(r'\.(py|ipynb)$', '', module_path)
+    
+    print(f"Executing notebook: {run_path} via dbutils.notebook.run")
+    # AS-IS runner와 동일하게 window range 및 hook trigger용 parameter 전달
+    result_payload = dbutils.notebook.run(run_path, 3600, arguments={
+        "window_start_ts": window_start_ts,
+        "window_end_ts": window_end_ts,
+        "single_runner_mode": "true"
+    })
+    
+    if result_payload and result_payload.startswith("global_temp."):
+        df = spark.sql(f"SELECT * FROM {result_payload}")
+        row_count = df.count()
+    else:
+        df = None
+        row_count = 0
+        
     print(f"Rule [{rule_id}] returned {row_count} findings.")
 
     if row_count == 0:

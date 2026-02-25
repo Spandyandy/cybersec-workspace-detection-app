@@ -584,3 +584,28 @@ def run_all_detections(
 
         except Exception as e:
             print(f"Failed to run {run_path}: {e}")
+
+# COMMAND ----------
+# Single Runner Hook 
+try:
+    _mode = ""
+    try:
+        _mode = dbutils.widgets.get("single_runner_mode")
+    except:
+        pass
+        
+    if _mode == "true":
+        import builtins
+        import uuid
+        def single_runner_display(df):
+            if df is not None:
+                view_name = f"runner_return_{uuid.uuid4().hex}"
+                df.createOrReplaceGlobalTempView(view_name)
+                dbutils.notebook.exit(f"global_temp.{view_name}")
+            else:
+                dbutils.notebook.exit("SUCCESS_EMPTY")
+        
+        # Override the global display function used by all detection scripts
+        builtins.display = single_runner_display
+except Exception as e:
+    pass
