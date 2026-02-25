@@ -4,6 +4,7 @@
 # MAGIC Python 룰 모듈(노트북)들을 `sandbox.audit_poc.rule_registry` 테이블에 등록합니다.
 
 # COMMAND ----------
+
 import re
 import os
 from datetime import datetime, timezone
@@ -63,21 +64,22 @@ WHEN MATCHED THEN UPDATE SET
   t.rule_group = s.rule_group,
   t.module_path = s.module_path,
   t.callable_name = s.callable_name,
-  t.lookback_minutes = s.lookback_minutes,
   t.updated_at = current_timestamp()
 WHEN NOT MATCHED THEN INSERT (
-  rule_id, enabled, rule_group, module_path, callable_name, lookback_minutes,
-  schedule_hint, severity, description, tags, owner, params_json, created_at, updated_at
+  rule_id, enabled, rule_group, module_path, callable_name,
+  severity, created_at, updated_at
 ) VALUES (
-  s.rule_id, s.enabled, s.rule_group, s.module_path, s.callable_name, s.lookback_minutes,
-  NULL, NULL, NULL, NULL, NULL, NULL, current_timestamp(), current_timestamp()
+  s.rule_id, s.enabled, s.rule_group, s.module_path, s.callable_name,
+  NULL, current_timestamp(), current_timestamp()
 )
 """)
 
 display(spark.sql("SELECT rule_group, COUNT(*) cnt FROM sandbox.audit_poc.rule_registry GROUP BY rule_group ORDER BY rule_group"))
-display(spark.sql("SELECT rule_id, rule_group, module_path, callable_name, lookback_minutes, enabled FROM sandbox.audit_poc.rule_registry ORDER BY rule_group, rule_id"))
+display(spark.sql("SELECT rule_id, rule_group, module_path, callable_name, enabled FROM sandbox.audit_poc.rule_registry ORDER BY rule_group, rule_id"))
+
 
 # COMMAND ----------
+
 # MAGIC %sql
 # MAGIC INSERT INTO sandbox.audit_poc.rule_checkpoint (
 # MAGIC   rule_id,
@@ -101,11 +103,13 @@ display(spark.sql("SELECT rule_id, rule_group, module_path, callable_name, lookb
 # MAGIC ON r.rule_id = c.rule_id;
 
 # COMMAND ----------
+
 # MAGIC %md
 # MAGIC # 02_job_generator
 # MAGIC 등록된 Detection 룰을 바탕으로 각각 고유한 개별 Databricks Job을 생성합니다. (1 Job = 1 Task 구조)
 
 # COMMAND ----------
+
 # Databricks Python SDK를 사용하여 Job 생성
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.service import jobs
@@ -138,6 +142,7 @@ print(f"Loaded {len(rules)} active rules from registry.")
 print(f"Option keep_history: {keep_history}")
 
 # COMMAND ----------
+
 # 2. Iterate through rules and create Jobs
 current_dt_str = datetime.now().strftime("%Y%m%d_%H%M%S")
 

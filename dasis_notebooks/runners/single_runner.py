@@ -4,6 +4,7 @@
 # MAGIC 단일 Detection 룰을 실행하며, Dedupe 여부를 파악한 뒤 개별 Delta Table과 Unified Delta Table에 MERGE 합니다.
 
 # COMMAND ----------
+
 import subprocess
 import sys
 # Ensure missing serverless libraries are installed at runtime
@@ -118,6 +119,7 @@ module_path = meta[0]["module_path"]
 callable_name = meta[0]["callable_name"]
 
 # COMMAND ----------
+
 # 4. Execute Rule Logic
 row_count = 0
 try:
