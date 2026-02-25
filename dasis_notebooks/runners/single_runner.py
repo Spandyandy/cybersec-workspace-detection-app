@@ -4,9 +4,13 @@
 # MAGIC 단일 Detection 룰을 실행하며, Dedupe 여부를 파악한 뒤 개별 Delta Table과 Unified Delta Table에 MERGE 합니다.
 
 # COMMAND ----------
+import subprocess
+import sys
+# Ensure missing serverless libraries are installed at runtime
+subprocess.check_call([sys.executable, "-m", "pip", "install", "geoip2", "netaddr", "--quiet"])
+
 import builtins
 import time
-import sys
 import datetime
 import traceback
 import pyspark.sql.functions as F
