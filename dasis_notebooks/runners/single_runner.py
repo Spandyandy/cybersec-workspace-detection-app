@@ -4,6 +4,7 @@
 # MAGIC 단일 Detection 룰을 실행하며, Dedupe 여부를 파악한 뒤 개별 Delta Table과 Unified Delta Table에 MERGE 합니다.
 
 # COMMAND ----------
+
 import subprocess
 import sys
 # Ensure missing serverless libraries are installed at runtime
@@ -32,10 +33,15 @@ severity = dbutils.widgets.get("severity").strip()
 
 if not rule_id:
     raise ValueError("rule_id is required parameter")
-if not window_start_ts:
-    raise ValueError("window_start_ts is required parameter")
 if not window_end_ts:
-    raise ValueError("window_end_ts is required parameter")
+    window_end_ts = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+if not window_start_ts:
+    try:
+        end_dt = datetime.datetime.strptime(window_end_ts, "%Y-%m-%d %H:%M:%S")
+    except ValueError:
+        end_dt = datetime.datetime.now(datetime.timezone.utc)
+    start_dt = end_dt - datetime.timedelta(hours=24)
+    window_start_ts = start_dt.strftime("%Y-%m-%d %H:%M:%S")
 
 run_id = f"{rule_id}_{int(time.time())}"
 print(f"Starting run for rule_id: {rule_id} | Window: {window_start_ts} ~ {window_end_ts} | Severity: {severity}")
@@ -94,6 +100,7 @@ def finalize_run(status: str, row_count: int = 0, error_msg: str = None):
 
 
 # COMMAND ----------
+
 # 3. Retrieve rule logic metadata (notebook path & callable name)
 meta_df = spark.sql(f"""
     SELECT module_path, callable_name
@@ -112,6 +119,7 @@ module_path = meta[0]["module_path"]
 callable_name = meta[0]["callable_name"]
 
 # COMMAND ----------
+
 # 4. Execute Rule Logic
 row_count = 0
 try:
