@@ -200,7 +200,22 @@ try:
     # 6. MERGE into Individual Table (`findings_{id}`)
     individual_tbl = f"sandbox.audit_poc.findings_{rule_id}"
 
-    spark.sql(f"CREATE TABLE IF NOT EXISTS {individual_tbl} USING DELTA")
+    def _ensure_table_columns(table_name: str, source_df):
+        existing_cols = {c.lower() for c in spark.table(table_name).columns}
+        missing_defs = []
+        for field in source_df.schema.fields:
+            if field.name.lower() not in existing_cols:
+                missing_defs.append(f"`{field.name}` {field.dataType.simpleString()}")
+
+        if missing_defs:
+            spark.sql(f"ALTER TABLE {table_name} ADD COLUMNS ({', '.join(missing_defs)})")
+            print(f"Schema evolved for {table_name}: {', '.join(missing_defs)}")
+
+    if not spark.catalog.tableExists(individual_tbl):
+        # 첫 생성 시 source schema를 그대로 사용해 MERGE 키 누락을 방지
+        out_df.limit(0).write.format("delta").mode("overwrite").saveAsTable(individual_tbl)
+    else:
+        _ensure_table_columns(individual_tbl, out_df)
 
     individual_target = DeltaTable.forName(spark, individual_tbl)
 
@@ -263,6 +278,8 @@ try:
             F.col("dedupe_key"),  # 앞서 생성한 고유 dedupe_key 유지
         )
     )
+
+    _ensure_table_columns(UNIFIED_TBL, unified_df)
 
     unified_target = DeltaTable.forName(spark, UNIFIED_TBL)
 
