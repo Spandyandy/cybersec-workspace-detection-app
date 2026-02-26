@@ -307,9 +307,14 @@ try:
     dbutils.notebook.exit("SUCCESS")
 
 except Exception as e:
+    # dbutils.notebook.exit("SUCCESS") raises a control-flow exception in Databricks.
+    # Do not convert it to FAILED status.
+    if str(e).startswith("Notebook exited:"):
+        raise
+
     err_str = str(e) + "\n" + traceback.format_exc()
     # Safely truncate error message
     err_str = err_str[:10000]
-        
+
     finalize_run("FAILED", row_count, err_str)
     raise e
