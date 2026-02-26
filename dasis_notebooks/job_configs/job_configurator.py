@@ -8,7 +8,6 @@
 
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.service import jobs
-import pyspark.sql.functions as F
 
 w = WorkspaceClient()
 
@@ -26,12 +25,12 @@ dbutils.widgets.dropdown("target_rule_group", "ALL", rule_groups)
 dbutils.widgets.dropdown("action_type", "DRY_RUN", ["DRY_RUN", "UPDATE_PARAMS", "UPDATE_SCHEDULE", "PAUSE_JOBS", "UNPAUSE_JOBS"])
 
 # Parameters for UPDATE_PARAMS
-dbutils.widgets.text("new_window_start_ts", "")
+dbutils.widgets.text("new_window_start_ts", "") # 2026-01-01 00:00:00
 dbutils.widgets.text("new_window_end_ts", "")
 dbutils.widgets.text("new_severity", "")
 
 # Parameters for UPDATE_SCHEDULE
-dbutils.widgets.text("new_cron_expression", "")  # e.g., "0 0 * * * ?" (매일 자정)
+dbutils.widgets.text("new_cron_expression", "")  # e.g., "0 0 * * * ?" (매일 자정) or 0 15,45 * * * ? * (매 15, 45분 마다)
 
 target_rule_group = dbutils.widgets.get("target_rule_group").strip()
 action_type = dbutils.widgets.get("action_type").strip()
@@ -80,8 +79,12 @@ for j in all_jobs:
             "severity": base_params.get("severity", "")
         })
 
-# 상태 출력
-jobs_df = spark.createDataFrame(audit_jobs)
+# 상태 출력 (empty-safe)
+jobs_schema = "job_id long, job_name string, rule_group string, schedule string, status string, rule_id string, window_start string, window_end string, severity string"
+if audit_jobs:
+    jobs_df = spark.createDataFrame(audit_jobs, jobs_schema)
+else:
+    jobs_df = spark.createDataFrame([], jobs_schema)
 display(jobs_df.orderBy("rule_group", "job_name"))
 
 # COMMAND ----------

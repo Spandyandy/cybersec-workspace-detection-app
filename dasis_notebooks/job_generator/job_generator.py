@@ -1,24 +1,129 @@
 # Databricks notebook source
 # MAGIC %md
+# MAGIC # 00_materialize_rules_as_py
+# MAGIC 룰 파일들을 Databricks 인터페이스에서 제거된 순수 Python 모듈(.py)로 머티리얼라이즈(Materialize)합니다.
+
+# COMMAND ----------
+
+# 00_materialize_rules_as_py (generic: recursive)
+import os
+
+
+def resolve_repo_paths():
+    nb_path = (
+        dbutils.notebook.entry_point.getDbutils()
+        .notebook()
+        .getContext()
+        .notebookPath()
+        .get()
+    )
+    repo_ws_root = "/".join(nb_path.split("/")[:4])   # /Repos/<user>/<repo>
+    repo_fs_root = f"/Workspace{repo_ws_root}"
+    return repo_ws_root, repo_fs_root
+
+
+repo_ws_root, repo_fs_root = resolve_repo_paths()
+
+out_fs_root = f"{repo_fs_root}/materialized_py"
+out_ws_root = f"{repo_ws_root}/materialized_py"
+
+
+def ensure_dir(p: str) -> None:
+    os.makedirs(p, exist_ok=True)
+
+
+def write_file(path: str, text: str) -> None:
+    ensure_dir(os.path.dirname(path))
+    with open(path, "w", encoding="utf-8") as f:
+        f.write(text)
+
+
+def strip_notebook_markers(text: str) -> str:
+    # Remove Databricks notebook markers and convert minimal magic for plain .py execution
+    out = []
+    for ln in text.splitlines():
+        if ln.startswith("# Databricks notebook source"):
+            continue
+        if ln.startswith("# COMMAND ----------"):
+            continue
+
+        # Convert `%run xxx/yyy` to python import for materialized package execution
+        if ln.startswith("# MAGIC %run "):
+            run_target = ln[len("# MAGIC %run "):].strip().strip('"').strip("'")
+            run_target = run_target.replace("\\", "/")
+            while run_target.startswith("../"):
+                run_target = run_target[3:]
+            while run_target.startswith("./"):
+                run_target = run_target[2:]
+            run_target = run_target.lstrip("/")
+            if run_target.endswith(".py"):
+                run_target = run_target[:-3]
+
+            module_name = run_target.replace("/", ".")
+            if module_name:
+                out.append(f"from {module_name} import *")
+            continue
+
+        # Drop other Databricks magic/comment cells from materialized output
+        if ln.startswith("# MAGIC"):
+            continue
+
+        out.append(ln)
+    return "\n".join(out).strip() + "\n"
+
+
+def ensure_init_py(dst_dir: str) -> None:
+    init_path = os.path.join(dst_dir, "__init__.py")
+    if not os.path.exists(init_path):
+        write_file(init_path, "")
+
+
+def materialize_tree(rel_src_root: str) -> None:
+    src_root = f"{repo_fs_root}/{rel_src_root}"
+    dst_root = f"{out_fs_root}/{rel_src_root}"
+    ensure_dir(dst_root)
+
+    for cur_dir, _, files in os.walk(src_root):
+        rel = os.path.relpath(cur_dir, src_root)  # "." or subdir
+        dst_dir = os.path.normpath(os.path.join(dst_root, rel))
+        ensure_dir(dst_dir)
+        ensure_init_py(dst_dir)
+
+        for fname in sorted(files):
+            if fname.startswith("_"):
+                continue
+            if not fname.endswith(".py"):
+                continue
+
+            src_path = os.path.join(cur_dir, fname)
+            dst_path = os.path.join(dst_dir, fname)
+
+            with open(src_path, "r", encoding="utf-8") as f:
+                raw = f.read()
+
+            clean = strip_notebook_markers(raw)
+            write_file(dst_path, clean)
+
+
+# package root init
+ensure_dir(out_fs_root)
+ensure_init_py(out_fs_root)
+
+# detections 전체 + lib 전체
+materialize_tree("base/detections")  # binary/behavioral/custom 모두 포함
+materialize_tree("lib")
+
+print("OK: materialized to", out_ws_root)
+
+# COMMAND ----------
+
+# MAGIC %md
 # MAGIC # 01_register_rules
 # MAGIC Python 룰 모듈(노트북)들을 `sandbox.audit_poc.rule_registry` 테이블에 등록합니다.
 
 # COMMAND ----------
 
 import re
-import os
-from datetime import datetime, timezone
-
-# repo root
-nb_path = (
-    dbutils.notebook.entry_point.getDbutils()
-    .notebook()
-    .getContext()
-    .notebookPath()
-    .get()
-)
-repo_ws_root = "/".join(nb_path.split("/")[:4])   # /Repos/<user>/<repo>
-repo_fs_root = f"/Workspace{repo_ws_root}"
 
 def extract_callable_name(py_file_text: str, fallback: str) -> str:
     """
@@ -38,8 +143,8 @@ for rule_group, lookback in [("binary", 1440), ("behavioral", 43200), ("custom",
                 continue
 
             rule_id = fname[:-3]
-            # Databricks 원본 노트북 직접 호출 (materialized_py 미사용)
-            module_path = f"{repo_ws_root}/base/detections/{rule_group}/{rule_id}"
+            # materialized_py 기준 import 경로: base.detections.<group>.<rule_id>
+            module_path = f"base.detections.{rule_group}.{rule_id}"
 
             with open(f"{folder_fs}/{fname}", "r", encoding="utf-8") as f:
                 text = f.read()
@@ -113,12 +218,11 @@ display(spark.sql("SELECT rule_id, rule_group, module_path, callable_name, enabl
 # Databricks Python SDK를 사용하여 Job 생성
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.service import jobs
-from databricks.sdk.service import compute
 from datetime import datetime
 
 # 위젯으로 keep_history 옵션 받기 (디폴트는 false)
 try:
-    dbutils.widgets.dropdown("keep_history", "false", ["false", "true"], "Keep previous jobs")
+    dbutils.widgets.dropdown("keep_history", "true", ["true", "false"], "Keep previous jobs")
     keep_history_str = dbutils.widgets.get("keep_history").strip().lower()
 except Exception:
     keep_history_str = "false"
