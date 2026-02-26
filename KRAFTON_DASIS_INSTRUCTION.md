@@ -4,10 +4,29 @@
 
 **1 룰 = 1 개별 Databricks Job** 구조로 구성되어 있으며, `Serverless Compute`와 `job_configurator`를 활용한 동적 파라미터 관리에 최적화되어 있습니다.
 
+DASIS 의 데모에서는 **system.access.audit, system.query.history** 테이블을 사용하지 않고, **sandbox.audit_poc.audit, sandbox.audit_poc.history** 테이블을 사용합니다. 이는 데모용으로 구성된 테이블이며, 실제 운영 시에는 올바른 테이블을 사용해야 합니다. 전체 코드베이스에 replace all 로 모든 테이블을 적절하게 변경해 주어야 합니다. 
+
+---
+
+## 0. 데이터브릭스 cybersec-workspace-detection-app 구성
+![alt text](metadata/image-1.png)
+### 0-1. 프로젝트 폴더 구조 및 주요 구성 요소
+base 안에는 크게 두 개의 주요 폴더로 구성되어 있습니다:
+
+
+*   **`detections/`**: 본 프로젝트에서 주로 관리하는 **Findings Rules**가 포함되어 있습니다.
+    *   `detections/` 내의 원본 룰들은 추후 dasis의 `materialized_rules/`로 변환되어 실제 탐지에 사용됩니다.
+    *   **Behavioral**: 30일 기준 데이터를 분석합니다.
+    *   **Binary**: 24시간 기준 데이터를 분석합니다.
+*   **`notebooks/`**: AI 감지, 유저 별 리포트, 데이터 반출입 보고서 등 유용한 노트북들이 포함되어 있습니다. 이 노트북들은 즉시 실행하여 필요한 정보를 얻는 용도로 활용할 수 있습니다.
+
+기본적인 구성에 대한 자세한 내용은 `README.md`를 참고하시기 바랍니다.
+
+
 ---
 
 ## 1. 아키텍처 중심 구조
-![alt text](image.png)
+![alt text](metadata/image.png)
 파이프라인은 탐지 룰을 중앙 레지스트리에 등록하고, 개별 Job을 동적으로 생성하여 독립적인 런타임 환경에서 각각 스케줄링 및 실행되도록 구성됩니다.
 
 ### 1-0. 소스 입력 데이터 및 시스템 테이블 (Source Data & System Tables)
@@ -83,15 +102,31 @@ PARTITIONED BY (rule_id);
 
 ### 2-2-1. `runners/single_runner.py` (실제 규칙 실행기)
 앞서 생성된 개별 Databricks Job이 호출하는 **단일 실행기(Single Runner)** 입니다. 
-실행 시점의 `window_start_ts`, `window_end_ts` 파라미터를 받아 실제 룰 로직을 추출하고, 그 결과를 개별 `findings_{rule_id}` 테이블과 통합 뷰 격인 `findings_unified` 테이블에 나란히 MERGE 합니다. 최종 처리 성공/실패 내역은 `rule_run_log`와 `rule_checkpoint`에 꼼꼼하게 반영하여 추후 실행을 대비합니다.
+Databricks 상에서 생성된 각 Job은 단일 Task(`single_runner`)를 바라보도록 구성되어 있습니다. 이 Task는 실행될 때 Job 레벨에서 설정된 인자(Parameters)를 넘겨받습니다. 
+
+**Task가 전달받는 주요 파라미터 구성:**
+- `RULE` (탐지 룰 ID)
+- `WINDOW_START_TS` ({{job.start_time}} 형태의 동적 평가 시간 혹은 명시적 시간)
+- `WINDOW_END_TS` ({{job.start_time}} 형태의 동적 평가 시간 혹은 명시적 시간)
+- `SEVERITY` (현재 사용되고 있지는 않음)
+
+`single_runner`는 위 파라미터(`rule_id`, `window_start_ts`, `window_end_ts`, `severity`)를 받아 레지스트리에서 해당 룰의 실제 모듈 경로와 함수명을 동적으로 찾아 로직을 실행합니다. 그 결과를 개별 `findings_{rule_id}` 테이블과 통합 뷰 격인 `findings_unified` 테이블에 나란히 MERGE 합니다. 최종 처리 성공/실패 내역은 `rule_run_log`와 `rule_checkpoint`에 꼼꼼하게 반영하여 추후 실행을 대비합니다.
 
 ### 2-2-2. `runners/bulk_runner.py` (모든 job 일회용 실행기)
 이 노트북은 등록된 모든 활성 룰을 한꺼번에 순차적으로 실행하기 위한 도구입니다. 주로 파이프라인 초기 구축 시 과거 데이터를 일괄 탐지하거나, 로직 변경 후 특정 구간의 데이터를 재처리(Re-run)해야 할 때 사용합니다. 내부적으로 `rule_registry`에서 활성화된 룰 목록을 조회하여 루프를 돌며 각 룰을 실행하며, 실행 결과와 체크포인트는 `single_runner`와 동일한 메커니즘으로 `rule_run_log` 및 각 Findings 테이블에 기록됩니다. 또한 rule_group 별로 task parameter를 주어 실행할 수 있습니다.
 
 ### 2-3. `job_configurator` (job 설정기)
 독립적으로 생성된 30여 개 이상의 잡(Job)들을 단일 UI 위젯에서 일괄 관리(Bulk Update) 할 수 있는 도우미 노트북입니다.
+
+![alt text](metadata/image-3.png)
+![alt text](metadata/image-4.png)
+
 특정 `rule_group` 단위로 기간 파라미터를 변경하거나, CRON 스케줄을 일괄 지정하고, 필요시 특정 룰 그룹 전체를 한 번에 PAUSE / UNPAUSE 활성화 제어할 수 있습니다.
 개별 job의 설정은 데이터브릭스 기본 Jobs & Pipelines UI에서 확인 및 수정 가능합니다.
+
+![alt text](metadata/image-2.png)
+
+> **힌트**: 3번째 셀을 돌리면 현재 모든 audit job들의 세팅 값 (schedule, status, parameter 값) 들을 확인할 수 있습니다.
 
 ---
 
@@ -106,6 +141,16 @@ PARTITIONED BY (rule_id);
 3. **스케줄 및 파라미터 구성**
    - `dasis_notebooks/job_configs/job_configurator.py` 노트북을 오픈합니다.
    - 대상 룰 그룹(혹은 전체)의 크론 스케줄(`UPDATE_SCHEDULE` 액션) 과 구동 파라미터를 사용자가 원하시는 주기에 맞추어 업데이트 해줍니다.
+4. **Dashboard 관리 방법 (룰 추가 시)**
+   - 새 룰이 추가되면 대시보드에서도 해당 룰 결과를 즉시 확인할 수 있도록 아래 순서로 반영합니다.
+   - **Data 탭에 결과 테이블 추가**
+     - 새 룰의 결과 테이블(예: `sandbox.audit_poc.findings_{rule_id}`)을 Dashboard의 **Data**에 추가합니다.
+   - **차트 위젯 생성 후 테이블 형태로 표시**
+     - 새 위젯을 만들고 방금 추가한 결과 테이블을 Dataset으로 연결합니다.
+     - Visualization은 기본 차트 유형에서 시작하더라도 최종적으로 **Table**로 설정해 결과를 표 형태로 확인 가능하게 만듭니다.
+   - **제목/설명 정리**
+     -   위젯 제목은 룰명 기준으로 명확하게 작성하고, 설명에는 탐지 목적/해석 포인트를 간단히 기록합니다.
+
 
 ### 3-2. 기존 룰의 로직 변경 및 수정 시
 탐지 조건이나 로직을 일부 변경해야 하여 `base/detections/...` 내에 위치한 소스 코드를 조정한 경우의 대처법입니다.
@@ -125,14 +170,28 @@ PARTITIONED BY (rule_id);
   - 파라미터 칸에 조회를 원하시는 `window_start_ts`와 `window_end_ts` 값을 수동으로 입력 후 재실행 버튼을 클릭합니다.
   - 과거 데이터를 리스캔하여 중복없이 병합 적재(MERGE) 해 주게 됩니다.
 
-### 3-5. Dashboard 관리 방법 (룰 추가 시)
-신규 룰이 추가되면 대시보드에서도 해당 룰 결과를 즉시 확인할 수 있도록 아래 순서로 반영합니다.
 
-1. **Data 탭에 결과 테이블 추가**
-   - 새 룰의 결과 테이블(예: `sandbox.audit_poc.findings_{rule_id}`)을 Dashboard의 **Data**에 추가합니다.
-2. **차트 위젯 생성 후 테이블 형태로 표시**
-   - 새 위젯을 만들고 방금 추가한 결과 테이블을 Dataset으로 연결합니다.
-   - Visualization은 기본 차트 유형에서 시작하더라도 최종적으로 **Table**로 설정해 결과를 표 형태로 확인 가능하게 만듭니다.
-3. **제목/설명 정리**
-   - 위젯 제목은 룰명 기준으로 명확하게 작성하고, 설명에는 탐지 목적/해석 포인트를 간단히 기록합니다.
+### 3-5. 원본 레포지토리(Upstream) 업데이트 반영 및 병합 가이드
+본 프로젝트는 Databricks의 원본 `cybersec-workspace-detection-app`을 포크(Fork)하여 KRAFTON DASIS 환경에 맞춰 커스텀된 프로젝트입니다. 원본 레포지토리에 새로운 탐지 룰이 추가되거나 로직 개선 등의 업데이트가 발생했을 때, 이를 현재 프로젝트로 안전하게 가져오고 적용하는 방법은 다음과 같습니다.
 
+1. **Upstream (원본 레포지토리) 리모트 추가 및 페치(Fetch)**
+   - 로컬 작업 환경(Git)에서 원본 레포지토리를 `upstream`으로 등록하고 최신 변경 사항을 가져옵니다.
+   ```bash
+   git remote add upstream https://github.com/databricks-solutions/cybersec-workspace-detection-app.git
+   git fetch upstream
+   ```
+
+2. **최신 변경 사항 병합 (Merge)**
+   - 현재 작업 중인 브랜치(예: `main`)에 `upstream`의 변경 사항을 병합합니다.
+   ```bash
+   git merge upstream/main
+   ```
+
+3. **충돌(Conflict) 해결 및 커스텀 로직 유지**
+   - 병합 과정에서 충돌이 발생할 수 있습니다. KRAFTON DASIS의 고유 로직(예: 커스텀 테이블 명칭, Payload Hashing 등)이 덮어씌워지지 않도록 주의하여 충돌을 해결해야 합니다.
+   - 특히 데모용으로 수정한 테이블명(`sandbox.audit_poc.audit` 등)이 원본의 `system.access.audit` 등으로 되돌아갔을 수 있으므로 다시 한번 확인하여 올바른 테이블명으로 변경해 줍니다.
+
+4. **업데이트 적용 (Databricks 파이프라인 동기화)**
+   - 병합된 최신 코드를 Databricks Repos에서 Pull 받아 갱신합니다.
+   - 원본 룰 코드(`base/detections/...`)의 변경 사항을 반영하기 위해 **`job_generator.py` 노트북의 `00_materialize_rules_as_py` 스텝을 실행**하여 최신 룰 파이썬 파일들을 다시 Materialize합니다.
+   - 만약 원본 업데이트를 통해 **새로운 룰이 추가된 경우**라면, 이어서 **`01_register_rules`** 와 **`02_job_generator`** 스텝을 전체 실행하여 레지스트리에 룰을 등록하고 새로운 Job을 생성합니다.
