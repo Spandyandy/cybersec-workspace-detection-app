@@ -106,6 +106,9 @@ def finalize_run(status: str, row_count: int = 0, error_msg: str = None):
 common = dbutils.import_notebook("lib.common")
 builtins.detect = common.detect
 builtins.Output = common.Output
+# Detection 노트북이 하단 테스트 블록에서 직접 호출하는 헬퍼도 주입
+if hasattr(common, "get_time_range_from_widgets"):
+    builtins.get_time_range_from_widgets = common.get_time_range_from_widgets
 builtins.dbutils = dbutils
 builtins.spark = spark
 builtins.F = F
@@ -141,6 +144,15 @@ callable_name = meta[0]["callable_name"]
 
 # 4. Execute Rule Logic
 row_count = 0
+
+# materialized 룰 모듈 import 시 하단의 테스트 블록(if __name__ == "__main__" or widget)
+# 이 자동 실행되지 않도록 widget 값을 비워 side-effect를 막습니다.
+try:
+    dbutils.widgets.text("window_start_ts", "")
+    dbutils.widgets.text("window_end_ts", "")
+except Exception:
+    pass
+
 try:
     mod = dbutils.import_notebook(module_path)
     fn = getattr(mod, callable_name)

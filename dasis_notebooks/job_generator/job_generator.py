@@ -34,13 +34,35 @@ def write_file(path: str, text: str) -> None:
 
 
 def strip_notebook_markers(text: str) -> str:
-    # Remove Databricks notebook markers so output is "plain .py"
+    # Remove Databricks notebook markers and convert minimal magic for plain .py execution
     out = []
     for ln in text.splitlines():
         if ln.startswith("# Databricks notebook source"):
             continue
         if ln.startswith("# COMMAND ----------"):
             continue
+
+        # Convert `%run xxx/yyy` to python import for materialized package execution
+        if ln.startswith("# MAGIC %run "):
+            run_target = ln[len("# MAGIC %run "):].strip().strip('"').strip("'")
+            run_target = run_target.replace("\\", "/")
+            while run_target.startswith("../"):
+                run_target = run_target[3:]
+            while run_target.startswith("./"):
+                run_target = run_target[2:]
+            run_target = run_target.lstrip("/")
+            if run_target.endswith(".py"):
+                run_target = run_target[:-3]
+
+            module_name = run_target.replace("/", ".")
+            if module_name:
+                out.append(f"from {module_name} import *")
+            continue
+
+        # Drop other Databricks magic/comment cells from materialized output
+        if ln.startswith("# MAGIC"):
+            continue
+
         out.append(ln)
     return "\n".join(out).strip() + "\n"
 
