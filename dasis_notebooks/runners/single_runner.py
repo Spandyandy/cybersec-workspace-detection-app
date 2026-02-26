@@ -124,13 +124,14 @@ if materialized_fs_root not in sys.path:
 # COMMAND ----------
 
 # 3. Retrieve rule logic metadata (module path & callable name)
-meta_df = spark.sql(f"""
-    SELECT module_path, callable_name
-    FROM sandbox.audit_poc.rule_registry
-    WHERE rule_id = '{rule_id}'
-      AND enabled = true
-""")
-meta = meta_df.collect()
+# NOTE: avoid SQL string interpolation for rule_id; use DataFrame API filter instead.
+meta = (
+    spark.table("sandbox.audit_poc.rule_registry")
+    .where((F.col("rule_id") == F.lit(rule_id)) & (F.col("enabled") == F.lit(True)))
+    .select("module_path", "callable_name")
+    .limit(1)
+    .collect()
+)
 
 if not meta:
     err_msg = f"Rule [{rule_id}] disabled or not found in registry."
