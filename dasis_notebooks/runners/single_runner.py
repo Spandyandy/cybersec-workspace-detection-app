@@ -64,21 +64,24 @@ def finalize_run(status: str, row_count: int = 0, error_msg: str = None):
         finished_at = datetime.datetime.fromtimestamp(end_time_ms / 1000.0, tz=datetime.timezone.utc)
         started_at = datetime.datetime.fromtimestamp(start_time_ms / 1000.0, tz=datetime.timezone.utc)
         
-        log_df = spark.createDataFrame([{
-            "run_id": run_id,
-            "rule_id": rule_id,
-            "window_start_ts": window_start_ts if window_start_ts else None,
-            "window_end_ts": window_end_ts if window_end_ts else None,
-            "started_at": started_at,
-            "finished_at": finished_at,
-            "status": status,
-            "row_count": int(row_count),
-            "duration_ms": int(duration_ms),
-            "runner_version": "1.0",
-            "error_message": str(error_msg) if error_msg else None,
-            "created_at": finished_at
-        }])
-        
+        log_schema = "run_id string, rule_id string, window_start_ts string, window_end_ts string, started_at timestamp, finished_at timestamp, status string, row_count long, duration_ms long, runner_version string, error_message string, created_at timestamp"
+        log_df = spark.createDataFrame([
+            (
+                run_id,
+                rule_id,
+                window_start_ts if window_start_ts else None,
+                window_end_ts if window_end_ts else None,
+                started_at,
+                finished_at,
+                status,
+                int(row_count),
+                int(duration_ms),
+                "1.0",
+                str(error_msg) if error_msg else None,
+                finished_at,
+            )
+        ], log_schema)
+
         # cast window_start_ts / end_ts to timestamp
         log_df = log_df.withColumn("window_start_ts", F.col("window_start_ts").cast("timestamp")) \
                        .withColumn("window_end_ts", F.col("window_end_ts").cast("timestamp"))
