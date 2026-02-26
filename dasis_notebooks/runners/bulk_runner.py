@@ -57,8 +57,14 @@ for j in all_jobs:
 print(f"\nFound {len(audit_jobs)} jobs matching target_rule_group: '{target_rule_group}'")
 
 if is_dry_run or len(audit_jobs) == 0:
-    # Show Jobs to be affected
-    dry_run_df = spark.createDataFrame([{"job_id": j.job_id, "job_name": j.settings.name, "rule_group": j.settings.tags.get("rule_group")} for j in audit_jobs])
+    # Show Jobs to be affected (empty-safe)
+    dry_run_rows = [
+        {"job_id": j.job_id, "job_name": j.settings.name, "rule_group": j.settings.tags.get("rule_group")}
+        for j in audit_jobs
+    ]
+    dry_run_schema = "job_id long, job_name string, rule_group string"
+    dry_run_df = spark.createDataFrame(dry_run_rows, dry_run_schema) if dry_run_rows else spark.createDataFrame([], dry_run_schema)
+
     print("\n[DRY RUN] The following jobs would be triggered:")
     display(dry_run_df)
     dbutils.notebook.exit("DRY_RUN completed. Set is_dry_run to 'False' to trigger jobs.")

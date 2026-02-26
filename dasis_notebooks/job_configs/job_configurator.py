@@ -8,7 +8,6 @@
 
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.service import jobs
-import pyspark.sql.functions as F
 
 w = WorkspaceClient()
 
@@ -80,8 +79,12 @@ for j in all_jobs:
             "severity": base_params.get("severity", "")
         })
 
-# 상태 출력
-jobs_df = spark.createDataFrame(audit_jobs)
+# 상태 출력 (empty-safe)
+jobs_schema = "job_id long, job_name string, rule_group string, schedule string, status string, rule_id string, window_start string, window_end string, severity string"
+if audit_jobs:
+    jobs_df = spark.createDataFrame(audit_jobs, jobs_schema)
+else:
+    jobs_df = spark.createDataFrame([], jobs_schema)
 display(jobs_df.orderBy("rule_group", "job_name"))
 
 # COMMAND ----------
