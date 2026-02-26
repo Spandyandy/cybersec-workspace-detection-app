@@ -25,12 +25,12 @@ dbutils.widgets.dropdown("target_rule_group", "ALL", rule_groups)
 dbutils.widgets.dropdown("action_type", "DRY_RUN", ["DRY_RUN", "UPDATE_PARAMS", "UPDATE_SCHEDULE", "PAUSE_JOBS", "UNPAUSE_JOBS"])
 
 # Parameters for UPDATE_PARAMS
-dbutils.widgets.text("new_window_start_ts", "")
+dbutils.widgets.text("new_window_start_ts", "") # 2026-01-01 00:00:00
 dbutils.widgets.text("new_window_end_ts", "")
 dbutils.widgets.text("new_severity", "")
 
 # Parameters for UPDATE_SCHEDULE
-dbutils.widgets.text("new_cron_expression", "")  # e.g., "0 0 * * * ?" (매일 자정)
+dbutils.widgets.text("new_cron_expression", "")  # e.g., "0 0 * * * ?" (매일 자정) or 0 15,45 * * * ? * (매 15, 45분 마다)
 
 target_rule_group = dbutils.widgets.get("target_rule_group").strip()
 action_type = dbutils.widgets.get("action_type").strip()
